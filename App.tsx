@@ -1,59 +1,99 @@
+import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
+import { BackHandler, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import {
+  SafeAreaProvider,
   SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+} from 'react-native-safe-area-context';
 
-type Project = {
-  title: string;
-  description: string;
-  stack: string[];
-};
+import PortfolioScreen from './src/screens/PortfolioScreen';
+import ProjectDetailScreen from './src/screens/ProjectDetailScreen';
+import RelationshipScreen from './src/screens/RelationshipScreen';
+import WebViewScreen from './src/screens/WebViewScreen';
+import { Project } from './src/screens/projects';
 
-const PROJECTS: Project[] = [
-  {
-    title: 'Zigtruck App',
-    description: '실시간 화물 매칭 모바일 앱',
-    stack: ['React Native', 'Firebase', 'WebView'],
-  },
-  {
-    title: 'hu_portfolio',
-    description: '나를 소개하는 포트폴리오 앱',
-    stack: ['Expo', 'React Native', 'TypeScript'],
-  },
-];
+type Route =
+  | { name: 'home' }
+  | { name: 'relationship' }
+  | { name: 'webview'; project: Project }
+  | { name: 'project'; project: Project };
+
+function AppContent() {
+  const [route, setRoute] = useState<Route>({ name: 'home' });
+
+  const goHome = () => setRoute({ name: 'home' });
+
+  const openProject = (project: Project) => {
+    if (project.action === 'relationship') {
+      setRoute({ name: 'relationship' });
+    } else if (project.action === 'webview' && project.webUrl) {
+      setRoute({ name: 'webview', project });
+    } else {
+      setRoute({ name: 'project', project });
+    }
+  };
+
+  // 안드로이드 시스템 뒤로가기: 홈이 아니면 앱을 닫지 않고 이전(홈)으로 이동.
+  useEffect(() => {
+    const onBackPress = () => {
+      if (route.name !== 'home') {
+        goHome();
+        return true; // 기본 동작(앱 종료) 막음
+      }
+      return false; // 홈에서는 기본 동작 허용
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [route]);
+
+  const headerTitle =
+    route.name === 'relationship'
+      ? '관계 분석'
+      : route.name === 'project' || route.name === 'webview'
+        ? route.project.title
+        : '';
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
+      <StatusBar style="light" />
+
+      {route.name !== 'home' && (
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={goHome}
+            style={styles.backButton}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Text style={styles.backText}>‹ 뒤로</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {headerTitle}
+          </Text>
+          <View style={styles.headerRight} />
+        </View>
+      )}
+
+      <View style={styles.body}>
+        {route.name === 'home' && (
+          <PortfolioScreen onOpenProject={openProject} />
+        )}
+        {route.name === 'relationship' && <RelationshipScreen />}
+        {route.name === 'webview' && route.project.webUrl && (
+          <WebViewScreen url={route.project.webUrl} />
+        )}
+        {route.name === 'project' && (
+          <ProjectDetailScreen project={route.project} />
+        )}
+      </View>
+    </SafeAreaView>
+  );
+}
 
 export default function App() {
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="light" />
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.name}>ChaeHyunHu</Text>
-          <Text style={styles.role}>Mobile / React Native Developer</Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Projects</Text>
-          {PROJECTS.map((project) => (
-            <View key={project.title} style={styles.card}>
-              <Text style={styles.cardTitle}>{project.title}</Text>
-              <Text style={styles.cardDesc}>{project.description}</Text>
-              <View style={styles.tagRow}>
-                {project.stack.map((tech) => (
-                  <View key={tech} style={styles.tag}>
-                    <Text style={styles.tagText}>{tech}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          ))}
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+    <SafeAreaProvider>
+      <AppContent />
+    </SafeAreaProvider>
   );
 }
 
@@ -62,63 +102,33 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0f172a',
   },
-  container: {
-    padding: 24,
+  body: {
+    flex: 1,
   },
   header: {
-    marginTop: 24,
-    marginBottom: 32,
-  },
-  name: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#f8fafc',
-  },
-  role: {
-    fontSize: 16,
-    color: '#94a3b8',
-    marginTop: 8,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#e2e8f0',
-    marginBottom: 16,
-  },
-  card: {
-    backgroundColor: '#1e293b',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#f1f5f9',
-  },
-  cardDesc: {
-    fontSize: 14,
-    color: '#cbd5e1',
-    marginTop: 6,
-  },
-  tagRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 12,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1e293b',
   },
-  tag: {
-    backgroundColor: '#334155',
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginRight: 8,
-    marginBottom: 8,
+  backButton: {
+    minWidth: 64,
   },
-  tagText: {
-    fontSize: 12,
-    color: '#e2e8f0',
+  backText: {
+    color: '#38bdf8',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    color: '#f1f5f9',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  headerRight: {
+    minWidth: 64,
   },
 });
